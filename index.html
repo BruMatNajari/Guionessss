@@ -78,6 +78,7 @@ dialog td{padding:3px 12px 3px 0}kbd{background:var(--bg);border:1px solid var(-
 <div class="row"><label>Color del texto</label><input type="color" id="fg"><button type="button" id="fgr">Restablecer</button></div>
 <div class="row"><label>Tamaño de letra</label><input type="range" id="fs" min="13" max="26" step="1"></div>
 <div class="row"><label>Imagen de fondo</label><input type="file" id="bgf" accept="image/png,image/jpeg,image/webp"></div>
+<div class="row"><label>O pegá un link</label><input id="bgu" placeholder="https://…/foto.png" style="flex:1;min-width:0"><button type="button" id="bgug">Usar</button></div>
 <div class="row"><label>Oscurecer fondo</label><input type="range" id="dim" min="0" max="95" step="5"></div>
 <div class="row"><button type="button" id="bgx">Quitar imagen</button></div>
 <p style="color:var(--mut);font-size:13px">La imagen se achica y se guarda solo en este navegador, no en la nube, así no gasta espacio.</p>
@@ -123,7 +124,7 @@ function applyCfg() {
   r.setProperty("--fs", (cfg.fs || 17) + "px");
   const dim = cfg.dim ?? 60;
   $("wrap").style.backgroundImage = cfg.bg
-    ? `linear-gradient(color-mix(in srgb,var(--bg) ${dim}%,transparent),color-mix(in srgb,var(--bg) ${dim}%,transparent)),url(${cfg.bg})` : "none";
+    ? `linear-gradient(color-mix(in srgb,var(--bg) ${dim}%,transparent),color-mix(in srgb,var(--bg) ${dim}%,transparent)),url("${cfg.bg}")` : "none";
   $("fg").value = cfg.fg || "#e8e4da"; $("fs").value = cfg.fs || 17; $("dim").value = dim;
 }
 $("cfgb").onclick = () => $("cdlg").showModal();
@@ -132,6 +133,15 @@ $("fgr").onclick = () => { delete cfg.fg; saveCfg(); applyCfg(); };
 $("fs").oninput = e => { cfg.fs = +e.target.value; saveCfg(); applyCfg(); };
 $("dim").oninput = e => { cfg.dim = +e.target.value; saveCfg(); applyCfg(); };
 $("bgx").onclick = () => { delete cfg.bg; saveCfg(); applyCfg(); };
+function useUrl() {
+  const u = $("bgu").value.trim(); if (!u) return;
+  const img = new Image();
+  img.onload = () => { cfg.bg = u; saveCfg(); applyCfg(); $("bgu").value = ""; };
+  img.onerror = () => alert("No pude cargar esa imagen. Probá con 'Copiar dirección de imagen' (que termine en .png o .jpg) o subila como archivo.");
+  img.src = u;
+}
+$("bgug").onclick = useUrl;
+$("bgu").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); useUrl(); } };
 $("bgf").onchange = e => {
   const f = e.target.files[0]; if (!f) return;
   const img = new Image();
