@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guiones</title>
+<style>
+:root{--bg:#1b1d1f;--panel:#232628;--ink:#e8e4da;--mut:#8b9096;--acc:#7fb4c9;--line:#33373a}
+@media (prefers-color-scheme:light){:root{--bg:#f3f1ec;--panel:#e9e6df;--ink:#202326;--mut:#6b7075;--acc:#2f6f87;--line:#d2cfc7}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px system-ui,sans-serif;display:flex}
+aside{width:250px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column}
+aside header{padding:12px;display:flex;gap:6px}
+button,input{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 10px}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--acc)}
+#list{flex:1;overflow:auto}
+#list div{padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#list div.on{background:var(--bg);border-left:3px solid var(--acc)}
+main{flex:1;display:flex;flex-direction:column;min-width:0}
+#top{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);align-items:center}
+#title{flex:1;font-weight:600;font-size:16px}
+#ed{flex:1;width:100%;max-width:760px;margin:0 auto;border:0;resize:none;background:transparent;color:var(--ink);
+font:16px/1.6 "Courier New",Courier,monospace;padding:28px 24px;outline:0}
+#bar{display:flex;gap:16px;padding:8px 16px;border-top:1px solid var(--line);color:var(--mut);font-size:13px;flex-wrap:wrap}
+#bar .r{margin-left:auto}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;max-width:480px}
+dialog::backdrop{background:#0008}
+dialog td{padding:3px 12px 3px 0}kbd{background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:1px 5px}
+@media(max-width:700px){aside{width:140px}}
+</style>
+</head>
+<body>
+<aside>
+  <header><button id="new">Nuevo</button><button id="help" title="F1">Atajos</button></header>
+  <div id="list"></div>
+  <header><button id="login" style="flex:1">Conectar nube</button></header>
+</aside>
+<main>
+  <div id="top"><input id="title" placeholder="Título del guion"><button id="del">Borrar</button></div>
+  <textarea id="ed" spellcheck="true" placeholder="INT. CASA - NOCHE&#10;&#10;MARÍA&#10;(bajito)&#10;¿Quién anda ahí?"></textarea>
+  <div id="bar"><span id="wc"></span><span id="pg"></span><span class="r" id="st"></span></div>
+</main>
+
+<dialog id="dlg"><form method="dialog">
+<h3 style="margin-top:0">Atajos</h3>
+<table>
+<tr><td><kbd>Ctrl+S</kbd></td><td>Guardar ahora</td></tr>
+<tr><td><kbd>Ctrl+N</kbd></td><td>Guion nuevo</td></tr>
+<tr><td><kbd>Alt+1</kbd></td><td>Escena INT.</td></tr>
+<tr><td><kbd>Alt+2</kbd></td><td>Escena EXT.</td></tr>
+<tr><td><kbd>Alt+3</kbd></td><td>Personaje (en mayúsculas)</td></tr>
+<tr><td><kbd>Alt+4</kbd></td><td>Acotación ( )</td></tr>
+<tr><td><kbd>Alt+5</kbd></td><td>Transición CORTE A:</td></tr>
+<tr><td><kbd>F1</kbd></td><td>Esta ayuda</td></tr>
+</table>
+<p style="color:var(--mut)">Abreviaturas (escribí y apretá espacio):<br>
+<kbd>;i</kbd> INT. &nbsp; <kbd>;e</kbd> EXT. &nbsp; <kbd>;d</kbd> - DÍA &nbsp; <kbd>;n</kbd> - NOCHE &nbsp; <kbd>;c</kbd> CORTE A:</p>
+<button>Cerrar</button></form></dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+// ====== CONFIG: pegá acá tu URL y tu clave ANON (nunca la service_role) ======
+const SUPA_URL = "https://TU-PROYECTO.supabase.co";
+const SUPA_KEY = "TU_ANON_KEY";
+// =============================================================================
+
+const $ = id => document.getElementById(id);
+const LS = "guiones.v1";
+let docs = JSON.parse(localStorage.getItem(LS) || "[]");   // [{id,title,body,t}]
+let cur = null, timer = null, db = null, user = null;
+
+const uid = () => crypto.randomUUID();
+const save_local = () => localStorage.setItem(LS, JSON.stringify(docs));
+
+// --- compresión gzip + base64: el texto ocupa ~60-70% menos en la nube ---
+async function pipe(str, stream) {
+  const w = stream.writable.getWriter(); w.write(str); w.close();
+  return new Response(stream.readable).arrayBuffer();
+}
+async function pack(s) {
+  if (s.length < 300) return s;                      // textos chicos: sin comprimir
+  const buf = new Uint8Array(await pipe(new TextEncoder().encode(s), new CompressionStream("gzip")));
+  let bin = ""; for (let i = 0; i < buf.length; i += 8192) bin += String.fromCharCode(...buf.subarray(i, i + 8192));
+  return "gz:" + btoa(bin);
+}
+async function unpack(s) {
+  if (!s.startsWith("gz:")) return s;
+  const bin = atob(s.slice(3)), u = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder().decode(await pipe(u, new DecompressionStream("gzip")));
+}
+
+// --- UI ---
+function renderList() {
+  $("list").innerHTML = "";
+  [...docs].sort((a, b) => b.t - a.t).forEach(d => {
+    const el = document.createElement("div");
+    el.textContent = d.title || "Sin título";
+    if (d.id === cur) el.className = "on";
+    el.onclick = () => open(d.id);
+    $("list").appendChild(el);
+  });
+}
+function open(id) {
+  cur = id; const d = docs.find(x => x.id === id);
+  $("title").value = d.title; $("ed").value = d.body; renderList(); stats();
+}
+function newDoc() {
+  const d = { id: uid(), title: "", body: "", t: Date.now() };
+  docs.push(d); save_local(); open(d.id); $("title").focus();
+}
+function stats() {
+  const t = $("ed").value, w = t.trim() ? t.trim().split(/\s+/).length : 0;
+  $("wc").textContent = w + " palabras";
+  $("pg").textContent = "≈ " + Math.max(1, Math.ceil(t.split("\n").length / 55)) + " pág.";
+}
+function status(m) { $("st").textContent = m; }
+
+function change() {
+  const d = docs.find(x => x.id === cur); if (!d) return;
+  d.title = $("title").value; d.body = $("ed").value; d.t = Date.now();
+  save_local(); stats(); renderList(); status("Sin guardar en la nube…");
+  clearTimeout(timer); timer = setTimeout(sync, 4000);   // guarda 4s después de dejar de escribir
+}
+
+// --- Supabase ---
+async function sync() {
+  const d = docs.find(x => x.id === cur);
+  if (!db || !user || !d) return status("Guardado local");
+  const { error } = await db.from("guiones").upsert({
+    id: d.id, user_id: user.id, title: d.title, body: await pack(d.body), updated_at: new Date(d.t).toISOString()
+  });
+  status(error ? "Error nube: " + error.message : "Guardado en la nube ✓");
+}
+async function pull() {
+  const { data, error } = await db.from("guiones").select("id,title,body,updated_at");
+  if (error) return status(error.message);
+  for (const r of data) {
+    const t = new Date(r.updated_at).getTime(), mine = docs.find(x => x.id === r.id);
+    if (!mine) docs.push({ id: r.id, title: r.title, body: await unpack(r.body), t });
+    else if (t > mine.t) Object.assign(mine, { title: r.title, body: await unpack(r.body), t });
+  }
+  save_local(); renderList(); if (cur) open(cur);
+}
+async function initCloud() {
+  if (!SUPA_KEY || SUPA_KEY.startsWith("TU_")) return status("Modo local (falta configurar Supabase)");
+  db = supabase.createClient(SUPA_URL, SUPA_KEY);
+  const { data } = await db.auth.getSession();
+  user = data.session?.user || null;
+  db.auth.onAuthStateChange((_e, s) => { user = s?.user || null; $("login").textContent = user ? "Nube: conectada" : "Conectar nube"; });
+  if (user) { $("login").textContent = "Nube: conectada"; await pull(); status("Sincronizado ✓"); }
+  else status("Modo local");
+}
+$("login").onclick = async () => {
+  if (!db) return alert("Configurá SUPA_URL y SUPA_KEY al inicio del script.");
+  if (user) return pull().then(() => status("Sincronizado ✓"));
+  const email = prompt("Tu email (te mando un link para entrar):"); if (!email) return;
+  const { error } = await db.auth.signInWithOtp({ email, options: { emailRedirectTo: location.href } });
+  alert(error ? error.message : "Listo, revisá tu correo y abrí el link.");
+};
+
+// --- atajos y abreviaturas ---
+const ABBR = { ";i": "INT. ", ";e": "EXT. ", ";d": "- DÍA", ";n": "- NOCHE", ";c": "CORTE A:" };
+function insert(txt, back = 0) {
+  const e = $("ed"), s = e.selectionStart;
+  e.setRangeText(txt, s, e.selectionEnd, "end"); e.selectionStart = e.selectionEnd = s + txt.length - back; e.focus(); change();
+}
+function lineStart() { const e = $("ed"); return e.value.lastIndexOf("\n", e.selectionStart - 1) + 1; }
+function onNewLine(txt, back) {
+  const e = $("ed"), empty = e.value.slice(lineStart(), e.selectionStart).trim() === "";
+  insert((empty ? "" : "\n\n") + txt, back);
+}
+document.addEventListener("keydown", ev => {
+  const k = ev.key.toLowerCase();
+  if ((ev.ctrlKey || ev.metaKey) && k === "s") { ev.preventDefault(); sync(); }
+  else if ((ev.ctrlKey || ev.metaKey) && k === "n") { ev.preventDefault(); newDoc(); }
+  else if (ev.key === "F1") { ev.preventDefault(); $("dlg").showModal(); }
+  else if (ev.altKey && $("ed") === document.activeElement) {
+    const m = { Digit1: () => onNewLine("INT. "), Digit2: () => onNewLine("EXT. "),
+      Digit3: () => onNewLine(""), Digit4: () => insert("()", 1),
+      Digit5: () => onNewLine("CORTE A:\n\n") }[ev.code];
+    if (m) { ev.preventDefault(); m(); }
+  }
+});
+$("ed").addEventListener("keydown", ev => {
+  if (ev.key !== " " && ev.key !== "Enter") return;
+  const e = $("ed"), pre = e.value.slice(lineStart(), e.selectionStart), w = pre.split(/\s/).pop();
+  if (ABBR[w]) { ev.preventDefault(); e.setRangeText(ABBR[w] + (ev.key === " " ? " " : "\n"), e.selectionStart - w.length, e.selectionEnd, "end"); change(); }
+});
+$("ed").oninput = $("title").oninput = change;
+$("new").onclick = newDoc; $("help").onclick = () => $("dlg").showModal();
+$("del").onclick = async () => {
+  if (!confirm("¿Borrar este guion?")) return;
+  if (db && user) await db.from("guiones").delete().eq("id", cur);
+  docs = docs.filter(x => x.id !== cur); save_local();
+  docs.length ? open(docs[0].id) : newDoc();
+};
+
+docs.length ? open([...docs].sort((a, b) => b.t - a.t)[0].id) : newDoc();
+initCloud();
+</script>
+</body>
+</html>
