@@ -6,7 +6,8 @@
 <title>Guiones</title>
 <style>
 :root{--bg:#1b1d1f;--panel:#232628;--ink:#e8e4da;--mut:#8b9096;--acc:#7fb4c9;--line:#33373a}
-@media (prefers-color-scheme:light){:root{--bg:#f3f1ec;--panel:#e9e6df;--ink:#202326;--mut:#6b7075;--acc:#2f6f87;--line:#d2cfc7}}
+@media (prefers-color-scheme:light){:root:not([data-theme]){--bg:#f3f1ec;--panel:#e9e6df;--ink:#202326;--mut:#6b7075;--acc:#2f6f87;--line:#d2cfc7}}
+:root[data-theme=light]{--bg:#f3f1ec;--panel:#e9e6df;--ink:#202326;--mut:#6b7075;--acc:#2f6f87;--line:#d2cfc7}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font:15px system-ui,sans-serif;display:flex}
@@ -37,20 +38,37 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);bor
 dialog::backdrop{background:#0008}
 dialog td{padding:3px 12px 3px 0}kbd{background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:1px 5px}
 .row{display:flex;gap:10px;align-items:center;margin:10px 0}.row label{width:130px}
+#mb{display:flex;gap:2px;padding:2px 8px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap;position:relative;z-index:30}
+.m{position:relative}
+.mb{border:0;background:none;padding:5px 10px}
+.mb:hover{background:var(--bg)}
+.dd{position:absolute;top:100%;left:0;min-width:260px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px;box-shadow:0 8px 24px #0006;z-index:40;white-space:pre}
+.dd[hidden]{display:none}
+.dd hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.mi{display:flex;width:100%;justify-content:space-between;gap:24px;border:0;background:none;text-align:left;padding:6px 10px;border-radius:4px}
+.mi:hover{background:var(--bg)}
+.mi kbd{color:var(--mut);font-size:12px}
+.m:nth-last-child(-n+2) .dd{left:auto;right:0}
+.focus aside,.focus #top{display:none}
 @media(max-width:700px){aside{width:150px}}
 </style>
 </head>
 <body>
 <aside>
 <header><button id="new" style="flex:1">+ Nuevo</button><button id="cfgb" title="Apariencia">Estilo</button><button id="help" title="F1">?</button></header>
+<input id="q" placeholder="Buscar guion… (Ctrl+K)" style="margin:0 10px 8px">
 <div id="list"></div>
 <header><button id="login" style="flex:1">Conectar nube</button></header>
 </aside>
 <main>
+<nav id="mb"></nav>
+<input type="file" id="imp" accept=".json,.txt" multiple hidden>
 <div id="top">
 <input id="title" placeholder="Nombre del guion">
 <select id="plat"><option>TikTok</option><option>Reels</option><option>Shorts</option><option>YouTube</option><option>Otro</option></select>
 <div class="sw" id="sw"></div>
+<button id="cp" title="Copiar el guion al portapapeles">Copiar</button>
+<button id="ex" title="Descargar como .txt">.txt</button>
 </div>
 <div id="wrap"><textarea id="ed" spellcheck="true" placeholder="Escribí tu guion…&#10;Probá ;g + espacio para el gancho."></textarea></div>
 <div id="bar"><span id="wc"></span><span id="dur"></span><span id="ch"></span><span class="r" id="st"></span></div>
@@ -67,11 +85,17 @@ dialog td{padding:3px 12px 3px 0}kbd{background:var(--bg);border:1px solid var(-
 <tr><td><kbd>Alt+4</kbd></td><td>[VISUAL: ] indicación de imagen</td></tr>
 <tr><td><kbd>Alt+5</kbd></td><td>Corte de escena ---</td></tr>
 <tr><td><kbd>Alt+6</kbd></td><td>PUNTOS CLAVE DEL JUEGO</td></tr>
+<tr><td><kbd>Alt+7</kbd></td><td>HASHTAGS</td></tr>
+<tr><td><kbd>Alt+8</kbd></td><td>NOTAS</td></tr>
+<tr><td><kbd>Ctrl+K</kbd></td><td>Buscar guion</td></tr>
+<tr><td><kbd>Enter</kbd></td><td>En una lista con "- ", sigue con otra viñeta (en una vacía, termina la lista)</td></tr>
+<tr><td><kbd>F9</kbd></td><td>Modo enfoque (solo el editor)</td></tr>
 <tr><td><kbd>F1</kbd></td><td>Esta ayuda</td></tr>
 </table>
 <p style="color:var(--mut)">Abreviaturas (escribí y apretá espacio):<br>
 <kbd>;g</kbd> GANCHO &nbsp; <kbd>;d</kbd> DESARROLLO &nbsp; <kbd>;c</kbd> CTA &nbsp; <kbd>;p</kbd> PUNTOS CLAVE<br>
-<kbd>;v</kbd> [VISUAL: ] &nbsp; <kbd>;t</kbd> [TEXTO EN PANTALLA: ] &nbsp; <kbd>;m</kbd> [MÚSICA: ]</p>
+<kbd>;v</kbd> [VISUAL: ] &nbsp; <kbd>;t</kbd> [TEXTO EN PANTALLA: ] &nbsp; <kbd>;m</kbd> [MÚSICA: ]<br>
+<kbd>;s</kbd> [SFX: ] &nbsp; <kbd>;h</kbd> HASHTAGS &nbsp; <kbd>;n</kbd> NOTAS</p>
 <button>Cerrar</button></form></dialog>
 
 <dialog id="cdlg"><form method="dialog">
@@ -91,10 +115,11 @@ const SUPA_URL = "https://osgcuabsburzkhhsudoz.supabase.co";
 const SUPA_KEY = "sb_publishable_-b4Ouo794iqyqwZMsnGvxQ_fITJFvl3";
 const $ = id => document.getElementById(id);
 const LS = "guiones.v1", CF = "guiones.cfg";
+const LIM = { TikTok: 180, Reels: 90, Shorts: 60 };
 const COLORS = ["", "#e5646b", "#e8a24a", "#e6d36a", "#6fbf8a", "#6aaee0", "#a98be0"];
 let docs = JSON.parse(localStorage.getItem(LS) || "[]");
 let cfg = JSON.parse(localStorage.getItem(CF) || "{}");
-let cur = null, timer = null, db = null, user = null;
+let cur = null, timer = null, db = null, user = null, fplat = "";
 const uid = () => crypto.randomUUID();
 const save_local = () => localStorage.setItem(LS, JSON.stringify(docs));
 const D = () => docs.find(x => x.id === cur);
@@ -122,6 +147,8 @@ function applyCfg() {
   const r = document.documentElement.style;
   cfg.fg ? r.setProperty("--fg", cfg.fg) : r.removeProperty("--fg");
   r.setProperty("--fs", (cfg.fs || 17) + "px");
+  cfg.theme ? document.documentElement.dataset.theme = cfg.theme : delete document.documentElement.dataset.theme;
+  document.body.classList.toggle("focus", !!cfg.focus);
   const dim = cfg.dim ?? 60;
   $("wrap").style.backgroundImage = cfg.bg
     ? `linear-gradient(color-mix(in srgb,var(--bg) ${dim}%,transparent),color-mix(in srgb,var(--bg) ${dim}%,transparent)),url("${cfg.bg}")` : "none";
@@ -156,7 +183,11 @@ $("bgf").onchange = e => {
 // ---------- lista ----------
 function renderList() {
   $("list").innerHTML = "";
-  [...docs].sort((a, b) => b.t - a.t).forEach(d => {
+  const q = $("q").value.trim().toLowerCase();
+  const by = { fecha: (a, b) => b.t - a.t, nombre: (a, b) => (a.title || "").localeCompare(b.title || "", "es"),
+    color: (a, b) => (a.color || "~").localeCompare(b.color || "~") || b.t - a.t }[cfg.sort || "fecha"];
+  docs.filter(d => (!q || ((d.title || "") + " " + (d.body || "")).toLowerCase().includes(q)) && (!fplat || (d.platform || "TikTok") === fplat))
+    .sort(by).forEach(d => {
     const el = document.createElement("div");
     el.className = "it" + (d.id === cur ? " on" : "");
     el.style.borderLeftColor = d.color || "transparent";
@@ -164,9 +195,11 @@ function renderList() {
     const p = document.createElement("small"); p.textContent = d.platform || "";
     const rn = document.createElement("button"); rn.textContent = "✎"; rn.title = "Cambiar nombre";
     rn.onclick = e => { e.stopPropagation(); open(d.id); $("title").focus(); $("title").select(); };
+    const dp = document.createElement("button"); dp.textContent = "⧉"; dp.title = "Duplicar";
+    dp.onclick = e => { e.stopPropagation(); dup(d.id); };
     const dl = document.createElement("button"); dl.textContent = "✕"; dl.title = "Borrar";
     dl.onclick = e => { e.stopPropagation(); remove(d.id); };
-    el.append(n, p, rn, dl); el.onclick = () => open(d.id); el.ondblclick = rn.onclick;
+    el.append(n, p, rn, dp, dl); el.onclick = () => open(d.id); el.ondblclick = rn.onclick;
     $("list").appendChild(el);
   });
 }
@@ -185,11 +218,16 @@ function open(id) {
   $("title").value = d.title; $("ed").value = d.body; $("plat").value = d.platform || "TikTok";
   renderList(); renderSw(); stats();
 }
-const TPL = "PUNTOS CLAVE DEL JUEGO:\n- \n- \n- \n\nGANCHO (0-3 s):\n\n\nDESARROLLO:\n\n\nCTA:\n";
+const TPL = "PUNTOS CLAVE DEL JUEGO:\n- Juego: \n- Objetivo: \n- Mecánica / reglas: \n- Momento clave: \n\nGANCHO (0-3 s):\n\n\nDESARROLLO:\n\n\nCTA:\n\n\nHASHTAGS:\n\n\nNOTAS:\n";
 function newDoc() {
   const d = { id: uid(), title: "", body: TPL, t: Date.now(), color: "", platform: "TikTok" };
   docs.push(d); save_local(); open(d.id);
-  $("ed").focus(); $("ed").selectionStart = $("ed").selectionEnd = TPL.indexOf("- ") + 2;
+  $("ed").focus(); $("ed").selectionStart = $("ed").selectionEnd = TPL.indexOf("Juego: ") + 7;
+}
+function dup(id) {
+  const o = docs.find(x => x.id === id); if (!o) return;
+  const d = { ...o, id: uid(), title: (o.title || "Sin nombre") + " (copia)", t: Date.now() };
+  docs.push(d); save_local(); open(d.id); queue();
 }
 async function remove(id) {
   const d = docs.find(x => x.id === id);
@@ -201,7 +239,8 @@ async function remove(id) {
 function stats() {
   const t = $("ed").value, w = t.trim() ? t.trim().split(/\s+/).length : 0;
   $("wc").textContent = w + " palabras"; $("ch").textContent = t.length + " caracteres";
-  $("dur").textContent = "≈ " + Math.round(w / 2.6) + " s hablado";
+  const sec = Math.round(w / 2.6), pl = $("plat").value, lim = LIM[pl];
+  $("dur").textContent = "≈ " + sec + " s hablado" + (lim && sec > lim ? " ⚠ pasa los " + lim + " s de " + pl : "");
 }
 const status = m => $("st").textContent = m;
 function change() {
@@ -245,7 +284,7 @@ $("login").onclick = async () => {
 };
 
 // ---------- atajos ----------
-const ABBR = { ";g": "GANCHO (0-3 s):", ";d": "DESARROLLO:", ";c": "CTA:", ";p": "PUNTOS CLAVE DEL JUEGO:", ";v": "[VISUAL: ]", ";t": "[TEXTO EN PANTALLA: ]", ";m": "[MÚSICA: ]" };
+const ABBR = { ";g": "GANCHO (0-3 s):", ";d": "DESARROLLO:", ";c": "CTA:", ";p": "PUNTOS CLAVE DEL JUEGO:", ";v": "[VISUAL: ]", ";t": "[TEXTO EN PANTALLA: ]", ";m": "[MÚSICA: ]", ";s": "[SFX: ]", ";h": "HASHTAGS:", ";n": "NOTAS:" };
 function insert(txt, back = 0) {
   const e = $("ed"), s = e.selectionStart;
   e.setRangeText(txt, s, e.selectionEnd, "end"); e.selectionStart = e.selectionEnd = s + txt.length - back; e.focus(); change();
@@ -259,27 +298,173 @@ document.addEventListener("keydown", ev => {
   const k = ev.key.toLowerCase();
   if ((ev.ctrlKey || ev.metaKey) && k === "s") { ev.preventDefault(); sync(); }
   else if ((ev.ctrlKey || ev.metaKey) && k === "n") { ev.preventDefault(); newDoc(); }
+  else if ((ev.ctrlKey || ev.metaKey) && k === "k") { ev.preventDefault(); $("q").focus(); $("q").select(); }
+  else if (ev.key === "F9") { ev.preventDefault(); toggleFocus(); }
   else if (ev.key === "F1") { ev.preventDefault(); $("dlg").showModal(); }
   else if (ev.altKey && document.activeElement === $("ed")) {
     const m = { Digit1: () => onNewLine("GANCHO (0-3 s):\n"), Digit2: () => onNewLine("DESARROLLO:\n"),
       Digit3: () => onNewLine("CTA:\n"), Digit4: () => insert("[VISUAL: ]", 1), Digit5: () => onNewLine("---\n\n"),
-      Digit6: () => onNewLine("PUNTOS CLAVE DEL JUEGO:\n- ") }[ev.code];
+      Digit6: () => onNewLine("PUNTOS CLAVE DEL JUEGO:\n- "), Digit7: () => onNewLine("HASHTAGS:\n"),
+      Digit8: () => onNewLine("NOTAS:\n") }[ev.code];
     if (m) { ev.preventDefault(); m(); }
   }
 });
 $("ed").addEventListener("keydown", ev => {
   if (ev.key !== " " && ev.key !== "Enter") return;
-  const e = $("ed"), w = e.value.slice(lineStart(), e.selectionStart).split(/\s/).pop();
+  const e = $("ed"), ls = lineStart(), line = e.value.slice(ls, e.selectionStart), w = line.split(/\s/).pop();
   if (ABBR[w]) {
     ev.preventDefault();
     const t = ABBR[w], tail = t.endsWith("]") ? "" : (ev.key === " " ? " " : "\n");
     e.setRangeText(t + tail, e.selectionStart - w.length, e.selectionEnd, "end");
     if (t.endsWith("]")) e.selectionStart = e.selectionEnd -= 1;
     change();
+    return;
+  }
+  if (ev.key === "Enter" && !ev.shiftKey && e.selectionStart === e.selectionEnd && /^- /.test(line)) {
+    ev.preventDefault();
+    if (line.trim() === "-") e.setRangeText("", ls, e.selectionStart, "end");
+    else e.setRangeText("\n- ", e.selectionStart, e.selectionEnd, "end");
+    change();
   }
 });
 $("ed").oninput = $("title").oninput = $("plat").onchange = change;
+$("q").oninput = renderList;
+$("cp").onclick = async () => { try { await navigator.clipboard.writeText($("ed").value); status("Copiado ✓"); } catch { status("No pude copiar"); } };
+$("ex").onclick = () => {
+  const d = D(); if (!d) return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([d.body], { type: "text/plain" }));
+  a.download = ((d.title || "guion").replace(/[\\/:*?"<>|]+/g, "").trim() || "guion") + ".txt";
+  a.click(); URL.revokeObjectURL(a.href);
+};
 $("new").onclick = newDoc; $("help").onclick = () => $("dlg").showModal();
+// ---------- menú ----------
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+function exportAll() {
+  download("guiones-" + new Date().toISOString().slice(0, 10) + ".json",
+    JSON.stringify(docs.map(({ title, body, color, platform }) => ({ title, body, color, platform })), null, 2), "application/json");
+}
+function toggleFocus() { cfg.focus = !cfg.focus; saveCfg(); applyCfg(); }
+const setCfg = (k, v) => () => { v === undefined ? delete cfg[k] : cfg[k] = v; saveCfg(); applyCfg(); renderList(); };
+const tick = (on, t) => (on ? "✓ " : "    ") + t;
+const edit = fn => () => { const e = $("ed"); e.focus(); fn(e); };
+const words = t => t.trim() ? t.trim().split(/\s+/).length : 0;
+
+const MENUS = {
+  Archivo: [
+    ["Nuevo guion", "Ctrl+N", () => newDoc()],
+    ["Duplicar guion", "", () => dup(cur)],
+    ["Cambiar nombre", "", () => { $("title").focus(); $("title").select(); }],
+    ["Borrar guion", "", () => remove(cur)],
+    0,
+    ["Guardar ahora", "Ctrl+S", () => sync()],
+    ["Exportar guion (.txt)", "", () => $("ex").click()],
+    ["Exportar todos (.json)", "", exportAll],
+    ["Importar (.txt o .json)…", "", () => $("imp").click()],
+    0,
+    ["Conectar / sincronizar nube", "", () => $("login").click()],
+    ["Cerrar sesión de la nube", "", async () => { if (db && user) { await db.auth.signOut(); status("Sesión cerrada"); } }]
+  ],
+  Editar: [
+    ["Deshacer", "Ctrl+Z", edit(() => document.execCommand("undo"))],
+    ["Rehacer", "Ctrl+Y", edit(() => document.execCommand("redo"))],
+    0,
+    ["Copiar guion completo", "", () => $("cp").click()],
+    ["Seleccionar todo", "Ctrl+A", edit(e => e.select())],
+    ["Buscar guion", "Ctrl+K", () => { $("q").focus(); $("q").select(); }],
+    0,
+    ["Limpiar espacios y saltos de más", "", edit(e => { e.value = e.value.replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n"); change(); })],
+    ["Restablecer plantilla", "", () => { if (D() && confirm("¿Reemplazar todo el texto por la plantilla vacía?")) { $("ed").value = TPL; change(); } }]
+  ],
+  Insertar: [
+    ["Puntos clave del juego", "Alt+6", () => onNewLine("PUNTOS CLAVE DEL JUEGO:\n- ")],
+    ["Gancho", "Alt+1", () => onNewLine("GANCHO (0-3 s):\n")],
+    ["Desarrollo", "Alt+2", () => onNewLine("DESARROLLO:\n")],
+    ["CTA", "Alt+3", () => onNewLine("CTA:\n")],
+    0,
+    ["[VISUAL: ]", "Alt+4", () => insert("[VISUAL: ]", 1)],
+    ["[TEXTO EN PANTALLA: ]", "", () => insert("[TEXTO EN PANTALLA: ]", 1)],
+    ["[MÚSICA: ]", "", () => insert("[MÚSICA: ]", 1)],
+    ["[SFX: ]", "", () => insert("[SFX: ]", 1)],
+    ["Corte de escena ---", "Alt+5", () => onNewLine("---\n\n")],
+    0,
+    ["Hashtags", "Alt+7", () => onNewLine("HASHTAGS:\n")],
+    ["Notas", "Alt+8", () => onNewLine("NOTAS:\n")],
+    ["Fecha de hoy", "", () => insert(new Date().toLocaleDateString("es-AR"))]
+  ],
+  Ver: [
+    [() => tick(cfg.focus, "Modo enfoque"), "F9", toggleFocus],
+    0,
+    [() => tick(!cfg.theme, "Tema automático"), "", setCfg("theme")],
+    [() => tick(cfg.theme === "light", "Tema claro"), "", setCfg("theme", "light")],
+    [() => tick(cfg.theme === "dark", "Tema oscuro"), "", setCfg("theme", "dark")],
+    0,
+    ["Letra más grande", "", () => { cfg.fs = Math.min(26, (cfg.fs || 17) + 1); saveCfg(); applyCfg(); }],
+    ["Letra más chica", "", () => { cfg.fs = Math.max(13, (cfg.fs || 17) - 1); saveCfg(); applyCfg(); }],
+    ["Estilo del editor…", "", () => $("cdlg").showModal()]
+  ],
+  Lista: [
+    [() => tick((cfg.sort || "fecha") === "fecha", "Ordenar: más recientes"), "", setCfg("sort", "fecha")],
+    [() => tick(cfg.sort === "nombre", "Ordenar: por nombre"), "", setCfg("sort", "nombre")],
+    [() => tick(cfg.sort === "color", "Ordenar: por color"), "", setCfg("sort", "color")],
+    0,
+    ...["", "TikTok", "Reels", "Shorts", "YouTube", "Otro"].map(pl =>
+      [() => tick(fplat === pl, pl ? "Solo " + pl : "Todas las plataformas"), "", () => { fplat = pl; renderList(); }])
+  ],
+  Ayuda: [
+    ["Atajos y abreviaturas", "F1", () => $("dlg").showModal()],
+    ["Resumen de mis guiones", "", () => alert(docs.length + " guiones · " + docs.reduce((n, d) => n + words(d.body), 0) + " palabras en total")],
+    ["Acerca de", "", () => alert("Guiones: editor de guiones para videos cortos.\nSe guarda en este navegador y, si conectás la nube, también en Supabase.")]
+  ]
+};
+
+const closeMenus = () => document.querySelectorAll(".dd").forEach(d => d.hidden = true);
+const anyOpen = () => !!document.querySelector(".dd:not([hidden])");
+function fillMenu(dd, items) {
+  dd.innerHTML = "";
+  items.forEach(it => {
+    if (!it) return dd.appendChild(document.createElement("hr"));
+    const [lab, key, fn] = it, bt = document.createElement("button"), sp = document.createElement("span");
+    bt.className = "mi"; sp.textContent = typeof lab === "function" ? lab() : lab; bt.append(sp);
+    if (key) { const k = document.createElement("kbd"); k.textContent = key; bt.append(k); }
+    bt.onclick = e => { e.stopPropagation(); closeMenus(); fn(); };
+    dd.appendChild(bt);
+  });
+}
+function buildMenu() {
+  for (const [name, items] of Object.entries(MENUS)) {
+    const w = document.createElement("div"), b = document.createElement("button"), dd = document.createElement("div");
+    w.className = "m"; b.className = "mb"; b.textContent = name; dd.className = "dd"; dd.hidden = true;
+    const show = () => { closeMenus(); fillMenu(dd, items); dd.hidden = false; };
+    b.onclick = e => { e.stopPropagation(); dd.hidden ? show() : closeMenus(); };
+    b.onmouseenter = () => { if (anyOpen()) show(); };
+    w.append(b, dd); $("mb").appendChild(w);
+  }
+  document.addEventListener("click", closeMenus);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenus(); });
+}
+$("imp").onchange = async e => {
+  let n = 0;
+  for (const f of e.target.files) {
+    try {
+      const txt = await f.text();
+      if (/\.json$/i.test(f.name)) {
+        const arr = JSON.parse(txt);
+        for (const o of (Array.isArray(arr) ? arr : [arr])) {
+          docs.push({ id: uid(), title: o.title || "", body: o.body || "", color: o.color || "", platform: o.platform || "TikTok", t: Date.now() }); n++;
+        }
+      } else {
+        docs.push({ id: uid(), title: f.name.replace(/\.txt$/i, ""), body: txt, color: "", platform: "TikTok", t: Date.now() }); n++;
+      }
+    } catch { alert("No pude leer " + f.name); }
+  }
+  e.target.value = "";
+  if (n) { save_local(); open(docs[docs.length - 1].id); status(n + " importado(s)"); queue(); }
+};
+buildMenu();
 applyCfg();
 docs.length ? open([...docs].sort((a, b) => b.t - a.t)[0].id) : newDoc();
 initCloud();
