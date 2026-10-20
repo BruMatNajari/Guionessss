@@ -42,18 +42,18 @@ dialog td{padding:3px 12px 3px 0}kbd{background:var(--bg);border:1px solid var(-
 </head>
 <body>
 <aside>
-  <header><button id="new" style="flex:1">+ Nuevo</button><button id="cfgb" title="Apariencia">Estilo</button><button id="help" title="F1">?</button></header>
-  <div id="list"></div>
-  <header><button id="login" style="flex:1">Conectar nube</button></header>
+<header><button id="new" style="flex:1">+ Nuevo</button><button id="cfgb" title="Apariencia">Estilo</button><button id="help" title="F1">?</button></header>
+<div id="list"></div>
+<header><button id="login" style="flex:1">Conectar nube</button></header>
 </aside>
 <main>
-  <div id="top">
-    <input id="title" placeholder="Nombre del guion">
-    <select id="plat"><option>TikTok</option><option>Reels</option><option>Shorts</option><option>YouTube</option><option>Otro</option></select>
-    <div class="sw" id="sw"></div>
-  </div>
-  <div id="wrap"><textarea id="ed" spellcheck="true" placeholder="Escribí tu guion…&#10;Probá ;g + espacio para el gancho."></textarea></div>
-  <div id="bar"><span id="wc"></span><span id="dur"></span><span id="ch"></span><span class="r" id="st"></span></div>
+<div id="top">
+<input id="title" placeholder="Nombre del guion">
+<select id="plat"><option>TikTok</option><option>Reels</option><option>Shorts</option><option>YouTube</option><option>Otro</option></select>
+<div class="sw" id="sw"></div>
+</div>
+<div id="wrap"><textarea id="ed" spellcheck="true" placeholder="Escribí tu guion…&#10;Probá ;g + espacio para el gancho."></textarea></div>
+<div id="bar"><span id="wc"></span><span id="dur"></span><span id="ch"></span><span class="r" id="st"></span></div>
 </main>
 
 <dialog id="dlg"><form method="dialog">
@@ -66,10 +66,11 @@ dialog td{padding:3px 12px 3px 0}kbd{background:var(--bg);border:1px solid var(-
 <tr><td><kbd>Alt+3</kbd></td><td>CTA (llamado a la acción)</td></tr>
 <tr><td><kbd>Alt+4</kbd></td><td>[VISUAL: ] indicación de imagen</td></tr>
 <tr><td><kbd>Alt+5</kbd></td><td>Corte de escena ---</td></tr>
+<tr><td><kbd>Alt+6</kbd></td><td>PUNTOS CLAVE DEL JUEGO</td></tr>
 <tr><td><kbd>F1</kbd></td><td>Esta ayuda</td></tr>
 </table>
 <p style="color:var(--mut)">Abreviaturas (escribí y apretá espacio):<br>
-<kbd>;g</kbd> GANCHO &nbsp; <kbd>;d</kbd> DESARROLLO &nbsp; <kbd>;c</kbd> CTA<br>
+<kbd>;g</kbd> GANCHO &nbsp; <kbd>;d</kbd> DESARROLLO &nbsp; <kbd>;c</kbd> CTA &nbsp; <kbd>;p</kbd> PUNTOS CLAVE<br>
 <kbd>;v</kbd> [VISUAL: ] &nbsp; <kbd>;t</kbd> [TEXTO EN PANTALLA: ] &nbsp; <kbd>;m</kbd> [MÚSICA: ]</p>
 <button>Cerrar</button></form></dialog>
 
@@ -88,7 +89,6 @@ dialog td{padding:3px 12px 3px 0}kbd{background:var(--bg);border:1px solid var(-
 <script>
 const SUPA_URL = "https://osgcuabsburzkhhsudoz.supabase.co";
 const SUPA_KEY = "sb_publishable_-b4Ouo794iqyqwZMsnGvxQ_fITJFvl3";
-
 const $ = id => document.getElementById(id);
 const LS = "guiones.v1", CF = "guiones.cfg";
 const COLORS = ["", "#e5646b", "#e8a24a", "#e6d36a", "#6fbf8a", "#6aaee0", "#a98be0"];
@@ -185,11 +185,11 @@ function open(id) {
   $("title").value = d.title; $("ed").value = d.body; $("plat").value = d.platform || "TikTok";
   renderList(); renderSw(); stats();
 }
-const TPL = "GANCHO (0-3 s):\n\n\nDESARROLLO:\n\n\nCTA:\n";
+const TPL = "PUNTOS CLAVE DEL JUEGO:\n- \n- \n- \n\nGANCHO (0-3 s):\n\n\nDESARROLLO:\n\n\nCTA:\n";
 function newDoc() {
   const d = { id: uid(), title: "", body: TPL, t: Date.now(), color: "", platform: "TikTok" };
   docs.push(d); save_local(); open(d.id);
-  $("ed").focus(); $("ed").selectionStart = $("ed").selectionEnd = TPL.indexOf("\n") + 1;
+  $("ed").focus(); $("ed").selectionStart = $("ed").selectionEnd = TPL.indexOf("- ") + 2;
 }
 async function remove(id) {
   const d = docs.find(x => x.id === id);
@@ -245,7 +245,7 @@ $("login").onclick = async () => {
 };
 
 // ---------- atajos ----------
-const ABBR = { ";g": "GANCHO (0-3 s):", ";d": "DESARROLLO:", ";c": "CTA:", ";v": "[VISUAL: ]", ";t": "[TEXTO EN PANTALLA: ]", ";m": "[MÚSICA: ]" };
+const ABBR = { ";g": "GANCHO (0-3 s):", ";d": "DESARROLLO:", ";c": "CTA:", ";p": "PUNTOS CLAVE DEL JUEGO:", ";v": "[VISUAL: ]", ";t": "[TEXTO EN PANTALLA: ]", ";m": "[MÚSICA: ]" };
 function insert(txt, back = 0) {
   const e = $("ed"), s = e.selectionStart;
   e.setRangeText(txt, s, e.selectionEnd, "end"); e.selectionStart = e.selectionEnd = s + txt.length - back; e.focus(); change();
@@ -262,7 +262,8 @@ document.addEventListener("keydown", ev => {
   else if (ev.key === "F1") { ev.preventDefault(); $("dlg").showModal(); }
   else if (ev.altKey && document.activeElement === $("ed")) {
     const m = { Digit1: () => onNewLine("GANCHO (0-3 s):\n"), Digit2: () => onNewLine("DESARROLLO:\n"),
-      Digit3: () => onNewLine("CTA:\n"), Digit4: () => insert("[VISUAL: ]", 1), Digit5: () => onNewLine("---\n\n") }[ev.code];
+      Digit3: () => onNewLine("CTA:\n"), Digit4: () => insert("[VISUAL: ]", 1), Digit5: () => onNewLine("---\n\n"),
+      Digit6: () => onNewLine("PUNTOS CLAVE DEL JUEGO:\n- ") }[ev.code];
     if (m) { ev.preventDefault(); m(); }
   }
 });
@@ -279,7 +280,6 @@ $("ed").addEventListener("keydown", ev => {
 });
 $("ed").oninput = $("title").oninput = $("plat").onchange = change;
 $("new").onclick = newDoc; $("help").onclick = () => $("dlg").showModal();
-
 applyCfg();
 docs.length ? open([...docs].sort((a, b) => b.t - a.t)[0].id) : newDoc();
 initCloud();
