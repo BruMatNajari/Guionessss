@@ -218,7 +218,8 @@ function open(id) {
   $("title").value = d.title; $("ed").value = d.body; $("plat").value = d.platform || "TikTok";
   renderList(); renderSw(); stats();
 }
-const TPL = "PUNTOS CLAVE DEL JUEGO:\n- Juego: \n- Objetivo: \n- Mecánica / reglas: \n- Momento clave: \n\nGANCHO (0-3 s):\n\n\nDESARROLLO:\n\n\nCTA:\n\n\nHASHTAGS:\n\n\nNOTAS:\n";
+const PK = "PUNTOS CLAVE DEL JUEGO:\n- Juego: \n- Objetivo: \n- Mecánica / reglas: \n- Momento clave: \n- Momento de video a usar: ";
+const TPL = PK + "\n\nGANCHO (0-3 s):\n\n\nDESARROLLO:\n\n\nCTA:\n\n\nHASHTAGS:\n\n\nNOTAS:\n";
 function newDoc() {
   const d = { id: uid(), title: "", body: TPL, t: Date.now(), color: "", platform: "TikTok" };
   docs.push(d); save_local(); open(d.id);
@@ -284,7 +285,7 @@ $("login").onclick = async () => {
 };
 
 // ---------- atajos ----------
-const ABBR = { ";g": "GANCHO (0-3 s):", ";d": "DESARROLLO:", ";c": "CTA:", ";p": "PUNTOS CLAVE DEL JUEGO:", ";v": "[VISUAL: ]", ";t": "[TEXTO EN PANTALLA: ]", ";m": "[MÚSICA: ]", ";s": "[SFX: ]", ";h": "HASHTAGS:", ";n": "NOTAS:" };
+const ABBR = { ";g": "GANCHO (0-3 s):", ";d": "DESARROLLO:", ";c": "CTA:", ";p": PK, ";v": "[VISUAL: ]", ";t": "[TEXTO EN PANTALLA: ]", ";m": "[MÚSICA: ]", ";s": "[SFX: ]", ";h": "HASHTAGS:", ";n": "NOTAS:" };
 function insert(txt, back = 0) {
   const e = $("ed"), s = e.selectionStart;
   e.setRangeText(txt, s, e.selectionEnd, "end"); e.selectionStart = e.selectionEnd = s + txt.length - back; e.focus(); change();
@@ -304,7 +305,7 @@ document.addEventListener("keydown", ev => {
   else if (ev.altKey && document.activeElement === $("ed")) {
     const m = { Digit1: () => onNewLine("GANCHO (0-3 s):\n"), Digit2: () => onNewLine("DESARROLLO:\n"),
       Digit3: () => onNewLine("CTA:\n"), Digit4: () => insert("[VISUAL: ]", 1), Digit5: () => onNewLine("---\n\n"),
-      Digit6: () => onNewLine("PUNTOS CLAVE DEL JUEGO:\n- "), Digit7: () => onNewLine("HASHTAGS:\n"),
+      Digit6: () => onNewLine(PK), Digit7: () => onNewLine("HASHTAGS:\n"),
       Digit8: () => onNewLine("NOTAS:\n") }[ev.code];
     if (m) { ev.preventDefault(); m(); }
   }
@@ -314,7 +315,7 @@ $("ed").addEventListener("keydown", ev => {
   const e = $("ed"), ls = lineStart(), line = e.value.slice(ls, e.selectionStart), w = line.split(/\s/).pop();
   if (ABBR[w]) {
     ev.preventDefault();
-    const t = ABBR[w], tail = t.endsWith("]") ? "" : (ev.key === " " ? " " : "\n");
+    const t = ABBR[w], tail = (t.endsWith("]") || t === PK) ? "" : (ev.key === " " ? " " : "\n");
     e.setRangeText(t + tail, e.selectionStart - w.length, e.selectionEnd, "end");
     if (t.endsWith("]")) e.selectionStart = e.selectionEnd -= 1;
     change();
@@ -380,7 +381,7 @@ const MENUS = {
     ["Restablecer plantilla", "", () => { if (D() && confirm("¿Reemplazar todo el texto por la plantilla vacía?")) { $("ed").value = TPL; change(); } }]
   ],
   Insertar: [
-    ["Puntos clave del juego", "Alt+6", () => onNewLine("PUNTOS CLAVE DEL JUEGO:\n- ")],
+    ["Puntos clave del juego", "Alt+6", () => onNewLine(PK)],
     ["Gancho", "Alt+1", () => onNewLine("GANCHO (0-3 s):\n")],
     ["Desarrollo", "Alt+2", () => onNewLine("DESARROLLO:\n")],
     ["CTA", "Alt+3", () => onNewLine("CTA:\n")],
